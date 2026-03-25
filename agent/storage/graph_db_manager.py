@@ -1,58 +1,39 @@
 from utils import get_config
 from neo4j import GraphDatabase
 
-cfg = get_config()
+_graph_db = None
+class GraphDatabase:
+    def __init__(self, uri, user, password):
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
 
-URI = cfg.GraphDatabase_URI
-AUTH = (cfg.GraphDatabase_Username, cfg.GraphDatabase_Password)
+    def close(self):
+        self.driver.close()
 
-with GraphDatabase.driver(URI, auth=AUTH) as driver:
-    driver.verify_connectivity()
+    def create_User(self, user_id, user_info):
+        with self.driver.session() as session:
+            # Create Person node
+            session.run("CREATE (p:Person {name: $name})", name=name)
+            # Create Age node
+            session.run("CREATE (a:Age {value: $age})", age=age)
+            # Create relationship between Person and Age
+            session.run("MATCH (p:Person {name: $name}), (a:Age {value: $age}) "
+                        "CREATE (p)-[:HAS_AGE]->(a)", name=name, age=age)
 
-def insert_data(tx):
-    tx.run("""
-    MERGE (u:User {name: 'Alice'})
-    MERGE (p:Product {name: 'Laptop'})
-    MERGE (u)-[:BOUGHT]->(p)
-    """)
+def load():
+    global _graph_db
+    if _graph_db is None:
+        uri = get_config('graph_db_uri')
+        user = get_config('graph_db_user')
+        password = get_config('graph_db_password')
+        _graph_db = GraphDatabase(uri, user, password)
+    return _graph_db
 
-with driver.session() as session:
-    session.execute_write(insert_data)
 
-def get_context(tx, question):
-    result = tx.run("""
-    MATCH (u:User)-[:BOUGHT]->(p:Product)
-    RETURN u.name AS user, p.name AS product
-    LIMIT 10
-    """)
-    
-    data = []
-    for record in result:
-        data.append(f"{record['user']} bought {record['product']}")
-    
-    return "\n".join(data)
 
-with driver.session() as session:
-    context = session.execute_read(get_context, "Who bought what?")
-
-# from openai import OpenAI
-client = OpenAI()
-
-prompt = f"""
-Context:
-{context}
-
-Question: Who bought what?
-Answer:
-"""
-
-response = client.chat.completions.create(
-    model="gpt-4.1-mini",
-    messages=[{"role": "user", "content": prompt}]
-)
-
-print(response.choices[0].message.content)
-
+# Create a person with age
+# graph_db.create_person_with_age('Alice', 30)
+graph_db.create_person_with_age('Bob', 25)
+graph_db.close()
 
 # emotions: main->happiness, sadness, fear, disgust, anger, and surprise
 # sub_emotions: 
