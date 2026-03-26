@@ -28,12 +28,12 @@ def load():
         _graph_db = GraphDatabase(uri, user, password)
     return _graph_db
 
+def close():
+    global _graph_db
+    if _graph_db is not None:
+        _graph_db.close()
+        _graph_db = None
 
-
-# Create a person with age
-# graph_db.create_person_with_age('Alice', 30)
-graph_db.create_person_with_age('Bob', 25)
-graph_db.close()
 
 # emotions: main->happiness, sadness, fear, disgust, anger, and surprise
 # sub_emotions: 
