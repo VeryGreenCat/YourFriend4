@@ -33,11 +33,3 @@ SUB_EMOTIONS = [
     ("sexual_desire",          "happiness"),
     ("anxiety",                "fear"),
 ]
-
-EXPRESSED_AS = [
-    ("empathy",   "empathic_pain"),
-    ("curiosity", "interest"),
-    ("optimism",  "joy"),
-    ("calmness",  "calmness"),
-    ("anxiety",   "anxiety"),
-]

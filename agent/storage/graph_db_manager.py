@@ -1,3 +1,6 @@
+from datetime import datetime
+
+from agent.utils import PRIMARY_EMOTIONS, SUB_EMOTIONS, TRAIT_NODES
 from utils import get_config
 from neo4j import GraphDatabase
 
@@ -5,19 +8,77 @@ _graph_db = None
 class GraphDatabase:
     def __init__(self, uri, user, password):
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
+        with self.driver.session() as session:
+            session.execute_write(self._run_setup)
 
     def close(self):
         self.driver.close()
 
-    def create_User(self, user_id, user_info):
+    def _run_setup(self, tx):
+        self._setup_trait(tx)
+
+    def _setup_trait(self, tx):
+        for name in TRAIT_NODES:
+            tx.run("MERGE (:Trait {name: $name})", name=name)
+        for name in PRIMARY_EMOTIONS:
+            tx.run("MERGE (:Emotion {name: $name, category: 'primary'})", name=name)
+        for name, primary in SUB_EMOTIONS:
+            tx.run("MERGE (:Emotion {name: $name, category: 'sub'})", name=name)
+            tx.run("""
+                MATCH (sub:Emotion {name: $sub})
+                MATCH (pri:Emotion {name: $pri})
+                MERGE (sub)-[:BELONGS_TO]->(pri)
+            """, sub=name, pri=primary)
+
+    def save_user(self, user_id, user_info):
+        name = user_info.get('name')
+        age = user_info.get('age')
+        gender = user_info.get('gender')
+        now = datetime.now().isoformat()
+
+        query = """
+        MERGE (u:User {id: $user_id})
+        ON CREATE SET 
+            u.name = $name,
+            u.age = $age,
+            u.gender = $gender,
+            u.createdAt = $now,
+            u.updatedAt = $now
+        ON MATCH SET 
+            u.name = CASE WHEN $name IS NOT NULL THEN $name ELSE u.name END,
+            u.age = CASE WHEN $age IS NOT NULL THEN $age ELSE u.age END,
+            u.gender = CASE WHEN $gender IS NOT NULL THEN $gender ELSE u.gender END,
+            u.updatedAt = $now
+        RETURN u
+        """
+        
         with self.driver.session() as session:
-            # Create Person node
-            session.run("CREATE (p:Person {name: $name})", name=name)
-            # Create Age node
-            session.run("CREATE (a:Age {value: $age})", age=age)
-            # Create relationship between Person and Age
-            session.run("MATCH (p:Person {name: $name}), (a:Age {value: $age}) "
-                        "CREATE (p)-[:HAS_AGE]->(a)", name=name, age=age)
+            try:
+                result = session.run(query, 
+                                    user_id=user_id, 
+                                    name=name, 
+                                    age=age, 
+                                    gender=gender, 
+                                    now=now)
+                print(f"User {user_id} saved (created or updated) successfully.")
+                return result.single()
+            except Exception as e:
+                print(f"Error saving user: {e}")
+                return None
+            
+    def update_user_summary(self, user_id, new_summary_text, vector_embedding):
+        now = datetime.now().isoformat()
+
+        query = """
+        MATCH (u:User {id: $user_id})
+        // สร้างหรืออัปเดต Node สรุปข้อมูล
+        MERGE (u)-[:HAS_SUMMARY]->(s:UserSummary)
+        SET s.text = $text,
+            s.embedding = $vector,
+            s.updatedAt = $now
+        """
+        with self.driver.session() as session:
+            session.run(query, user_id=user_id, text=new_summary_text, vector=vector_embedding, now=now)
 
 def load():
     global _graph_db
