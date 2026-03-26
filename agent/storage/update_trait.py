@@ -18,7 +18,6 @@ PRIMARY_EMOTIONS = [
 ]
 
 SUB_EMOTIONS = [
-    # (name, belongs_to_primary)
     ("admiration",             "surprise"),
     ("adoration",              "happiness"),
     ("aesthetic_appreciation", "happiness"),
