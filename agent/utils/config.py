@@ -34,6 +34,10 @@ class Config:
     Supabase_Service_Key: str = field(
         default_factory=lambda: os.getenv("SUPABASE_SERVICE_KEY", os.getenv("SUPABASE_KEY", ""))
     )
+    # Discord bot settings
+    Discord_Bot_Token: str = field(
+        default_factory=lambda: os.getenv("DISCORD_BOT_TOKEN", "")
+    )
 
 # Singleton
 _config: Config | None = None

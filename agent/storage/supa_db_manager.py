@@ -58,3 +58,28 @@ def get_or_create_profile(user_id: str, email: str, user_metadata: dict) -> dict
         client.table("UserProfile").insert(profile_data).execute()
     )
     return insert_result.data[0] if insert_result.data else profile_data
+
+
+def get_profile(user_id: str) -> dict | None:
+    """Return the UserProfile row for the given user_id, or None if not found."""
+    client = load()
+    result = (
+        client.table("UserProfile")
+        .select("*")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
+
+def upsert_profile(user_id: str, data: dict) -> dict:
+    """Insert or update the UserProfile row for the given user_id."""
+    client = load()
+    payload = {"user_id": user_id, **data}
+    result = (
+        client.table("UserProfile")
+        .upsert(payload)
+        .execute()
+    )
+    return result.data[0] if result.data else payload

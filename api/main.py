@@ -33,13 +33,12 @@ app.add_middleware(JWTMiddleware)
     tags=["Auth"],
 )
 async def get_profile(request: Request):
-    user = request.state.user  # set by JWTMiddleware
+    user = request.state.user
 
     user_id: str = user.get("sub", "")
     email: str = user.get("email", "")
     user_metadata: dict = user.get("user_metadata", {})
 
-    # Get or create profile row in Supabase
     profile_data = supa_db_manager.get_or_create_profile(user_id, email, user_metadata)
 
     # Merge User node in Neo4j
