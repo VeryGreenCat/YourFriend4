@@ -26,6 +26,14 @@ class Config:
     openai_api_key: str = field(
         default_factory=lambda: os.getenv("OPENAI_API_KEY", "")
     )
+    # Supabase settings
+    Supabase_URL: str = field(
+        default_factory=lambda: os.getenv("SUPABASE_URL", "")
+    )
+    # Use service role key for backend operations; fall back to anon key
+    Supabase_Service_Key: str = field(
+        default_factory=lambda: os.getenv("SUPABASE_SERVICE_KEY", os.getenv("SUPABASE_KEY", ""))
+    )
 
 # Singleton
 _config: Config | None = None

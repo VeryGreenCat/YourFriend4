@@ -32,8 +32,9 @@ class JWTMiddleware(BaseHTTPMiddleware):
         try:
             payload = jwt.decode(
                 token,
-                config.jwt_secret,
-                algorithms=[config.jwt_algorithm],
+                config.supabase_jwt_secret,
+                algorithms=["HS256"],
+                options={"verify_aud": False},
             )
             request.state.user = payload
         except JWTError as e:

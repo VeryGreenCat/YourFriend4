@@ -1,13 +1,13 @@
 from datetime import datetime
 
 from agent.utils import PRIMARY_EMOTIONS, SUB_EMOTIONS, TRAIT_NODES
-from utils import get_config
-from neo4j import GraphDatabase
+from agent.utils import get_config
+from neo4j import GraphDatabase as _Neo4jDriver
 
 _graph_db = None
 class GraphDatabase:
     def __init__(self, uri, user, password):
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+        self.driver = _Neo4jDriver.driver(uri, auth=(user, password))
         with self.driver.session() as session:
             session.execute_write(self._run_setup)
 
@@ -83,10 +83,12 @@ class GraphDatabase:
 def load():
     global _graph_db
     if _graph_db is None:
-        uri = get_config('graph_db_uri')
-        user = get_config('graph_db_user')
-        password = get_config('graph_db_password')
-        _graph_db = GraphDatabase(uri, user, password)
+        config = get_config()
+        _graph_db = GraphDatabase(
+            config.GraphDatabase_URI,
+            config.GraphDatabase_Username,
+            config.GraphDatabase_Password,
+        )
     return _graph_db
 
 def close():
