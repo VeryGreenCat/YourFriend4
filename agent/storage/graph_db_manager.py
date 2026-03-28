@@ -65,7 +65,7 @@ class GraphDatabase:
             except Exception as e:
                 print(f"Error saving user: {e}")
                 return None
-            
+    
     def update_user_summary(self, user_id, new_summary_text, vector_embedding):
         now = datetime.now().isoformat()
 
