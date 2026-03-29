@@ -89,14 +89,12 @@ class BotCreateModal(discord.ui.Modal, title="สร้าง Bot ของค�
 
             try:
                 traits, conditions, emotions = update_bot_traits(bot_id, traits_text)
-                print(f"[bot_create] update_bot_traits success: {len(traits)} traits, {len(conditions)} conditions, {len(emotions)} emotions")
+                try:
+                    create_emotion_conditions(bot_id, conditions)
+                except Exception as exc:
+                    print(f"[bot_create] create_emotion_conditions failed: {exc}")
             except Exception as exc:
-                print(f"[bot_create] update_bot_traits failed: {exc}")
                 traits, conditions, emotions = [], [], []
-            try:
-                create_emotion_conditions(bot_id, conditions)
-            except Exception as exc:
-                print(f"[bot_create] create_emotion_conditions failed: {exc}")
 
             # 4. Extract world views from backstory
             try:

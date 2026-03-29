@@ -1,59 +1,34 @@
-from typing import TypedDict
-from langgraph.graph import StateGraph, END
-from langchain_openai import ChatOpenAI
+from __future__ import annotations
 
-llm = ChatOpenAI(model="gpt-4o-mini")
+from agent.managers import traits_manager
+from agent.memory import memory_manager
+from agent.orchestration.listen import listen
+from agent.orchestration.thinking import think
+from agent.storage import graph_db_manager
 
-# ---- state ----
-class State(TypedDict):
-    query: str
-    tool_result: str
-    answer: str
-# ---- nodes ----
 
-def decide(state: State):
-    q = state["query"]
-    if any(op in q for op in ["+", "-", "*", "/"]):
-        return {"tool": "calculator"}
-    return {"tool": "llm"}
+def analyze_message(bot_id: str, user_id: str, user_input: str) -> str:
+    """Process a user message through the listen → think pipeline.
 
-def calculator(state: State):
-    result = str(eval(state["query"]))
-    return {"tool_result": result}
+    1. **Listen** – analyse the input and update the bot's emotions.
+    2. **Think** – gather full context and generate the bot's reply.
+    """
+    # ── Phase 1: Listen ──────────────────────────────────────
+    listen(user_input, bot_id)
 
-def generate(state: State):
-    if "tool_result" in state:
-        return {"answer": f"Result: {state['tool_result']}"}
-    response = llm.invoke(state["query"])
-    return {"answer": response.content}
+    # ── Phase 2: Gather updated context ──────────────────────
+    db = graph_db_manager.load()
+    traits = db.get_bot_traits(bot_id)
+    current_emotions = db.get_bot_emotions(bot_id)
+    recent_chats = memory_manager.get_latest_n_chat(bot_id, n=5)
 
-# ---- graph ----
-builder = StateGraph(State)
+    # ── Phase 3: Think ───────────────────────────────────────
+    response = think(
+        user_input=user_input,
+        bot_id=bot_id,
+        traits=traits,
+        current_emotions=current_emotions,
+        recent_chats=recent_chats,
+    )
 
-builder.add_node("decide", decide)
-builder.add_node("calculator", calculator)
-builder.add_node("generate", generate)
-
-builder.set_entry_point("decide")
-
-# conditional routing
-def route(state: State):
-    return state["tool"]
-
-builder.add_conditional_edges(
-    "decide",
-    route,
-    {
-        "calculator": "calculator",
-        "llm": "generate"
-    }
-)
-
-builder.add_edge("calculator", "generate")
-builder.add_edge("generate", END)
-
-graph = builder.compile()
-
-# ---- run ----
-result = graph.invoke({"query": "25 * 4"})
-print(result["answer"])
+    return response

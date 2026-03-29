@@ -1,5 +1,7 @@
 from datetime import datetime
+
 from neo4j import GraphDatabase as _Neo4jDriver
+
 from agent.utils import EMOTIONS, TRAIT_NODES, get_config
 
 _graph_db = None
@@ -145,6 +147,40 @@ class GraphDatabase:
                 now=now,
             )
 
+    # ── Bot Summary ──────────────────────────────────────────
+
+    def get_bot_summary(self, bot_id: str) -> tuple[str | None, list | None]:
+        query = """
+        MATCH (b:Bot {id: $bot_id})-[:HAS_SUMMARY]->(s:BotSummary)
+        RETURN s.text AS summary, s.embedding AS embedding
+        """
+        with self.driver.session() as session:
+            result = session.run(query, bot_id=bot_id)
+            record = result.single()
+            if record:
+                return record["summary"], record["embedding"]
+            return None, None
+
+    def update_bot_summary(
+        self, bot_id: str, new_summary_text: str, vector_embedding: list
+    ) -> None:
+        now = datetime.now().isoformat()
+        query = """
+        MATCH (b:Bot {id: $bot_id})
+        MERGE (b)-[:HAS_SUMMARY]->(s:BotSummary)
+        SET s.text = $text,
+            s.embedding = $vector,
+            s.updatedAt = $now
+        """
+        with self.driver.session() as session:
+            session.run(
+                query,
+                bot_id=bot_id,
+                text=new_summary_text,
+                vector=vector_embedding,
+                now=now,
+            )
+
     # ── Bot ↔ Trait ──────────────────────────────────────────
 
     def link_bot_trait(self, bot_id, trait_name, weight):
@@ -174,17 +210,46 @@ class GraphDatabase:
             result = session.run(query, bot_id=bot_id)
             return {record["trait_name"]: record["weight"] for record in result}
 
+    def get_bot_emotions(self, bot_id: str) -> dict[str, float]:
+        query = """
+        MATCH (b:Bot {id: $bot_id})-[r:HAS_EMOTION]->(e:Emotion)
+        RETURN e.name AS emotion_name, r.weight AS weight
+        """
+        with self.driver.session() as session:
+            result = session.run(query, bot_id=bot_id)
+            return {record["emotion_name"]: record["weight"] for record in result}
+
     # ── Bot ↔ Emotion ────────────────────────────────────────
 
-    def link_bot_emotion(self, bot_id, emotion_name, weight):
+    def link_bot_emotion(self, bot_id, emotion_name, weight, reason):
         query = """
         MATCH (b:Bot {id: $bot_id})
         MATCH (e:Emotion {name: $emotion_name})
         MERGE (b)-[r:HAS_EMOTION]->(e)
-        SET r.weight = $weight
+        SET r.weight = $weight, r.reason = $reason
         """
         with self.driver.session() as session:
-            session.run(query, bot_id=bot_id, emotion_name=emotion_name, weight=weight)
+            session.run(
+                query,
+                bot_id=bot_id,
+                emotion_name=emotion_name,
+                weight=weight,
+                reason=reason,
+            )
+
+    def update_bot_emotion(self, bot_id, emotion_name, weight, reason):
+        query = """
+        MATCH (b:Bot {id: $bot_id})-[r:HAS_EMOTION]->(e:Emotion {name: $emotion_name})
+        SET r.weight = $weight, r.reason = $reason
+        """
+        with self.driver.session() as session:
+            session.run(
+                query,
+                bot_id=bot_id,
+                emotion_name=emotion_name,
+                weight=weight,
+                reason=reason,
+            )
 
     def clear_bot_emotions(self, bot_id):
         query = """

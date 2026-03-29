@@ -15,6 +15,9 @@ def update_bot_traits(bot_id: str, traits_text: str):
     emotions : dict[str, float]
     """
     traits, conditions, emotions = extract_traits_and_conditions(traits_text)
+    print("Traits", traits)
+    print("Conditions", conditions)
+    print("Emotions", emotions)
 
     db = graph_db_manager.load()
 
