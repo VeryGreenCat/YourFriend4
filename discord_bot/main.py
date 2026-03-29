@@ -56,10 +56,13 @@ class YourFriendBot(discord.Client):
         )
 
         if bot_profile:
-            message = analyze_message(
-                bot_profile["bot_id"], bot_profile["user_id"], message.content
+            reply = await asyncio.to_thread(
+                analyze_message,
+                bot_profile["bot_id"],
+                bot_profile["user_id"],
+                message.content,
             )
-            await message.channel.send(message)
+            await message.channel.send(reply)
         # else:
         #     print(
         #         f"[DM] No BotProfile found for discord_id={discord_id} (user_uuid={user_uuid})"

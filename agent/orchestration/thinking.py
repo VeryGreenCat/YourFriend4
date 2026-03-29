@@ -11,16 +11,23 @@ from agent.utils import llm
 from agent.utils.config import get_config
 
 
+class ThinkingResult(TypedDict):
+    react: str  # 3rd-person internal reasoning
+    message: str  # 1st-person bot reply
+
+
 class ThinkingState(TypedDict):
     user_input: str
     bot_id: str
+    bot_name: str
     traits: Dict[str, float]
     current_emotions: Dict[str, Any]  # {"emotion": {"weight": float, "reason": str}}
     recent_chats: List[Dict[str, str]]
     world_views: List[Dict]
     memory_summary: Optional[str]
     backstory_chunks: List[str]
-    response: str
+    react: str  # 3rd-person reasoning about how to respond
+    response: str  # 1st-person message the bot will say
 
 
 # ── Graph nodes ───────────────────────────────────────────────────────────────
@@ -40,8 +47,12 @@ def pull_rag_memory(state: ThinkingState) -> ThinkingState:
 
 
 def generate_response(state: ThinkingState) -> ThinkingState:
-    """Synthesize all context and generate the bot's simulated response."""
+    """Produce a ReAct reasoning (3rd person) and the bot's reply (1st person)."""
+    import time as _time
+
     cfg = get_config()
+    bot_name = state["bot_name"]
+    unix_time = int(_time.time())
 
     traits_text = (
         "\n".join(f"  - {k}: {v:.2f}" for k, v in state["traits"].items()) or "  (none)"
@@ -84,13 +95,19 @@ def generate_response(state: ThinkingState) -> ThinkingState:
     summary_text = state.get("memory_summary") or "(no summary available)"
 
     system_prompt = (
-        "You are simulating a bot's authentic reply to the user.\n"
-        "Use the bot's traits, emotional state, worldviews, memories, and backstory "
-        "to produce a response that feels natural and consistent with its personality.\n"
-        "Reply ONLY with the bot's message — no meta-commentary, no explanations."
+        f"You are simulating the internal thought process and reply of a bot named '{bot_name}'.\n"
+        "Use the bot's traits, emotional state, worldviews, memories, and backstory.\n\n"
+        "You MUST output EXACTLY a JSON array with two strings:\n"
+        "  1. ReAct — 3rd-person reasoning describing what the bot thinks/feels and how it decides to respond.\n"
+        "  2. Message — the 1st-person message the bot will actually say to the user.\n\n"
+        'Example: ["ตอบแบบโกรธ เพราะว่าผู้ใช้พูดจาไม่ดี", "อย่ามายุ่ง"]\n\n'
+        "Output ONLY the JSON array — no extra text, no markdown fences."
     )
 
-    user_prompt = f"""User's message: {state["user_input"]}
+    user_prompt = f"""Bot Name: {bot_name}
+Current Unix Time: {unix_time}
+
+User's message: {state["user_input"]}
 
 === Bot Context ===
 
@@ -112,15 +129,27 @@ Summary Memory:
 Relevant Backstory Chunks:
 {backstory_text}
 
-=== Bot's Response ==="""
+=== Output (JSON array: [react, message]) ==="""
 
     messages = [
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_prompt},
     ]
 
-    response = llm.chat_completion(cfg.traits_llm_model, messages, temperature=0.7)
-    return {**state, "response": response}
+    raw = llm.chat_completion(cfg.traits_llm_model, messages, temperature=0.7)
+
+    import json as _json
+
+    try:
+        parsed = _json.loads(raw)
+        if isinstance(parsed, list) and len(parsed) == 2:
+            react, response = parsed[0], parsed[1]
+        else:
+            react, response = raw, raw
+    except (_json.JSONDecodeError, ValueError):
+        react, response = raw, raw
+
+    return {**state, "react": react, "response": response}
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
@@ -129,11 +158,12 @@ Relevant Backstory Chunks:
 def think(
     user_input: str,
     bot_id: str,
+    bot_name: str,
     traits: Dict[str, float],
     current_emotions: Dict[str, Any],
     recent_chats: List[Dict[str, str]],
-) -> str:
-    """Run the thinking pipeline and return the bot's simulated response.
+) -> ThinkingResult:
+    """Run the thinking pipeline and return the bot's ReAct reasoning + message.
 
     Args:
         user_input:       The user's latest message.
@@ -144,7 +174,8 @@ def think(
         recent_chats:     Recent conversation history [{role, content}, ...].
 
     Returns:
-        The simulated bot response string.
+        ThinkingResult with ``react`` (3rd-person reasoning) and ``message``
+        (1st-person bot reply).
     """
     graph = StateGraph(ThinkingState)
     graph.add_node("pull_world_views", pull_world_views)
@@ -161,14 +192,16 @@ def think(
     initial_state: ThinkingState = {
         "user_input": user_input,
         "bot_id": bot_id,
+        "bot_name": bot_name,
         "traits": traits,
         "current_emotions": current_emotions,
         "recent_chats": recent_chats,
         "world_views": [],
         "memory_summary": None,
         "backstory_chunks": [],
+        "react": "",
         "response": "",
     }
 
     result = app.invoke(initial_state)
-    return result["response"]
+    return ThinkingResult(react=result["react"], message=result["response"])

@@ -201,6 +201,15 @@ class GraphDatabase:
         with self.driver.session() as session:
             session.run(query, bot_id=bot_id)
 
+    def get_bot_name(self, bot_id: str) -> str | None:
+        query = """
+        MATCH (b:Bot {id: $bot_id})
+        RETURN b.name AS name
+        """
+        with self.driver.session() as session:
+            record = session.run(query, bot_id=bot_id).single()
+            return record["name"] if record else None
+
     def get_bot_traits(self, bot_id: str) -> dict[str, float]:
         query = """
         MATCH (b:Bot {id: $bot_id})-[r:HAS_TRAIT]->(t:Trait)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import List, Optional
 
 from supabase import Client, create_client
@@ -112,7 +113,7 @@ def get_latest_n_chat(bot_id: str, n: int) -> List[dict]:
     client = load()
     result = (
         client.table("ChatHistory")
-        .select("content, snapshot")
+        .select("content, snap_shot")
         .eq("bot_id", bot_id)
         .order("created_at", desc=True)  # Assuming 'created_at' is the timestamp column
         .limit(n)
@@ -121,3 +122,47 @@ def get_latest_n_chat(bot_id: str, n: int) -> List[dict]:
 
     # The result.data will be a list of dictionaries like [{'content': '...', 'snapshot': '...'}]
     return result.data if result.data else []
+
+
+def add_chat_history(
+    user_id: str,
+    bot_id: str,
+    content: str,
+    snapshot: str,
+    author: str,
+    channel_id: str | None = None,
+) -> dict | None:
+    """Add a new chat history record to the ChatHistory table.
+
+    Parameters
+    ----------
+    user_id : str
+        The ID of the user.
+    bot_id : str
+        The ID of the bot.
+    content : str
+        The chat message content.
+    snapshot : str
+        The state snapshot at the time of the message.
+    author : str
+        The author of the message ('bot' or 'user').
+    channel_id : str | None
+        Optional channel ID. Defaults to None.
+
+    Returns
+    -------
+    dict | None
+        The inserted chat history record, or None if insertion failed.
+    """
+    client = load()
+    chat_data = {
+        "user_id": user_id,
+        "bot_id": bot_id,
+        "channel_id": channel_id,
+        "content": content,
+        "snap_shot": snapshot,
+        "author": author,
+        "created_at": datetime.now().isoformat(),
+    }
+    result = client.table("ChatHistory").insert(chat_data).execute()
+    return result.data[0] if result.data else None
