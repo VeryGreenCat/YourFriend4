@@ -7,24 +7,14 @@ serializable dict you can forward to your ingestion pipeline.
 """
 from typing import Dict, List, Any
 
-from agent.models import load_traits_model, load_text_emotion_model
+from agent.extractor.traits_extractor import load
+from agent.extractor.emotion_extractor import predict_text_emotion
 
 
 def create_langraph_payload(text: str, character_id: str | None = None) -> Dict[str, Any]:
-    """Create a payload consisting of nodes and edges based on analyser outputs.
-
-    Args:
-        text: The character description to analyze.
-        character_id: Optional stable id for the character node.
-
-    Returns:
-        A dict with `nodes` and `edges` lists suitable for ingestion.
-    """
-    traits_model = load_traits_model()
-    emotion_model = load_text_emotion_model()
-
+    traits_model = load()
     traits = traits_model(text)
-    emotions = emotion_model(text)
+    emotions = predict_text_emotion(text)
 
     cid = character_id or "character:1"
 

@@ -13,18 +13,29 @@ class Config:
     GraphDatabase_Password: str = field(
         default_factory=lambda: os.getenv("GRAPH_DATABASE_PASSWORD", "")
     )
-    text_emotion_model_path: str = field(
-        default_factory=lambda: os.getenv("TEXT_EMOTION_MODEL_PATH", "./data/models/text_emotion")
-    )
-    text_emotion_model_top_k: int = field(
-        default_factory=lambda: int(os.getenv("TEXT_EMOTION_MODEL_TOP_K", "5"))
-    )
     # LLM traits model settings
     traits_llm_model: str = field(
-        default_factory=lambda: os.getenv("TRAITS_LLM_MODEL", "gpt-4o-mini")
+        default_factory=lambda: os.getenv("TRAITS_LLM_MODEL", "qwen3-vl:235b")
+    )
+    llm_backend: str = field(
+        default_factory=lambda: os.getenv("LLM_BACKEND", "ollama")
+    )
+    ollama_url: str = field(
+        default_factory=lambda: os.getenv("OLLAMA_URL", "http://localhost:11434")
+    )
+    ollama_api_key: str = field(
+        default_factory=lambda: os.getenv("OLLAMA_API_KEY", "")
     )
     openai_api_key: str = field(
         default_factory=lambda: os.getenv("OPENAI_API_KEY", "")
+    )
+    # Embedding backend ('openai', 'sbert')
+    embedding_backend: str = field(
+        default_factory=lambda: os.getenv("EMBEDDING_BACKEND", "sbert")
+    )
+    # Local SentenceTransformer model name for embeddings (used when embedding_backend='sbert')
+    embedding_model: str = field(
+        default_factory=lambda: os.getenv("EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-mpnet-base-v2")
     )
     # Supabase settings
     Supabase_URL: str = field(

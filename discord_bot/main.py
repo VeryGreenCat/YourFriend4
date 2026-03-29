@@ -13,6 +13,7 @@ sys.path.insert(0, _root)
 
 from agent.utils.config import get_config
 from discord_bot.commands import profile as profile_cmd
+from discord_bot.commands import bot as bot_cmd
 
 
 class YourFriendBot(discord.Client):
@@ -23,6 +24,7 @@ class YourFriendBot(discord.Client):
 
     async def setup_hook(self) -> None:
         profile_cmd.register(self.tree)
+        bot_cmd.register(self.tree)
         await self.tree.sync()
 
     async def on_ready(self) -> None:

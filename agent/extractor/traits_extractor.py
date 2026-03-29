@@ -4,6 +4,7 @@ import re
 from typing import Dict
 
 from agent.utils.config import get_config
+from agent.utils.llm import chat_completion
 
 _model = None
 
@@ -62,16 +63,7 @@ class TraitsModel:
     ]
 
     def __init__(self, model_name: str | None = None, api_key: str | None = None):
-        try:
-            import openai
-        except Exception as e:
-            raise RuntimeError("openai package is required for TraitsModel") from e
-
-        if api_key:
-            openai.api_key = api_key
-            
         self.model_name = model_name or os.getenv("TRAITS_LLM_MODEL", "gpt-4o-mini")
-        self._openai = openai
 
     def _build_system_prompt(self) -> str:
         return (
@@ -106,14 +98,7 @@ class TraitsModel:
             {"role": "user", "content": f"Character:\n{text}"},
         ]
 
-        resp = self._openai.ChatCompletion.create(
-            model=self.model_name,
-            messages=messages,
-            temperature=0,
-            max_tokens=400,
-        )
-
-        content = resp["choices"][0]["message"]["content"].strip()
+        content = chat_completion(self.model_name, messages, temperature=0)
 
         data = None
         try:
@@ -150,7 +135,6 @@ def load():
     global _model
     if _model is None:
         cfg = get_config()
-        api_key = cfg.openai_api_key or None
         model_name = cfg.traits_llm_model or None
-        _model = TraitsModel(model_name=model_name, api_key=api_key)
+        _model = TraitsModel(model_name=model_name)
     return _model

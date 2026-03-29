@@ -83,3 +83,41 @@ def upsert_profile(user_id: str, data: dict) -> dict:
         .execute()
     )
     return result.data[0] if result.data else payload
+
+
+# ── BotProfile ──────────────────────────────────────────────
+
+
+def get_bot_profile_by_user(user_id: str) -> dict | None:
+    """Return the BotProfile row for the given user_id, or None."""
+    client = load()
+    result = (
+        client.table("BotProfile")
+        .select("*")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
+
+def upsert_bot_profile(user_id: str, data: dict) -> dict:
+    """Insert or update the BotProfile row for the given user_id."""
+    client = load()
+    existing = get_bot_profile_by_user(user_id)
+    if existing:
+        result = (
+            client.table("BotProfile")
+            .update(data)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        return result.data[0] if result.data else {**existing, **data}
+    else:
+        payload = {"user_id": user_id, **data}
+        result = (
+            client.table("BotProfile")
+            .insert(payload)
+            .execute()
+        )
+        return result.data[0] if result.data else payload
