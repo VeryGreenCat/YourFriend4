@@ -1,7 +1,5 @@
 from datetime import datetime
-
 from neo4j import GraphDatabase as _Neo4jDriver
-
 from agent.utils import EMOTIONS, TRAIT_NODES, get_config
 
 _graph_db = None
@@ -166,6 +164,15 @@ class GraphDatabase:
         """
         with self.driver.session() as session:
             session.run(query, bot_id=bot_id)
+
+    def get_bot_traits(self, bot_id: str) -> dict[str, float]:
+        query = """
+        MATCH (b:Bot {id: $bot_id})-[r:HAS_TRAIT]->(t:Trait)
+        RETURN t.name AS trait_name, r.weight AS weight
+        """
+        with self.driver.session() as session:
+            result = session.run(query, bot_id=bot_id)
+            return {record["trait_name"]: record["weight"] for record in result}
 
     # ── Bot ↔ Emotion ────────────────────────────────────────
 

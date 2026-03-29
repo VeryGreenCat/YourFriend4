@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import List, Optional
 
 from supabase import Client, create_client
 
@@ -39,9 +39,7 @@ def get_or_create_profile(user_id: str, email: str, user_metadata: dict) -> dict
         or (email.split("@")[0] if email else user_id)
     )
     display_name = (
-        user_metadata.get("full_name")
-        or user_metadata.get("name")
-        or username
+        user_metadata.get("full_name") or user_metadata.get("name") or username
     )
 
     profile_data = {
@@ -54,9 +52,7 @@ def get_or_create_profile(user_id: str, email: str, user_metadata: dict) -> dict
         "age": user_metadata.get("age") or None,
     }
 
-    insert_result = (
-        client.table("UserProfile").insert(profile_data).execute()
-    )
+    insert_result = client.table("UserProfile").insert(profile_data).execute()
     return insert_result.data[0] if insert_result.data else profile_data
 
 
@@ -77,11 +73,7 @@ def upsert_profile(user_id: str, data: dict) -> dict:
     """Insert or update the UserProfile row for the given user_id."""
     client = load()
     payload = {"user_id": user_id, **data}
-    result = (
-        client.table("UserProfile")
-        .upsert(payload)
-        .execute()
-    )
+    result = client.table("UserProfile").upsert(payload).execute()
     return result.data[0] if result.data else payload
 
 
@@ -92,11 +84,7 @@ def get_bot_profile_by_user(user_id: str) -> dict | None:
     """Return the BotProfile row for the given user_id, or None."""
     client = load()
     result = (
-        client.table("BotProfile")
-        .select("*")
-        .eq("user_id", user_id)
-        .limit(1)
-        .execute()
+        client.table("BotProfile").select("*").eq("user_id", user_id).limit(1).execute()
     )
     return result.data[0] if result.data else None
 
@@ -107,17 +95,29 @@ def upsert_bot_profile(user_id: str, data: dict) -> dict:
     existing = get_bot_profile_by_user(user_id)
     if existing:
         result = (
-            client.table("BotProfile")
-            .update(data)
-            .eq("user_id", user_id)
-            .execute()
+            client.table("BotProfile").update(data).eq("user_id", user_id).execute()
         )
         return result.data[0] if result.data else {**existing, **data}
     else:
         payload = {"user_id": user_id, **data}
-        result = (
-            client.table("BotProfile")
-            .insert(payload)
-            .execute()
-        )
+        result = client.table("BotProfile").insert(payload).execute()
         return result.data[0] if result.data else payload
+
+
+# ── ChatHistory ──────────────────────────────────────────────
+
+
+def get_latest_n_chat(bot_id: str, n: int) -> List[dict]:
+    """Return the latest *n* chat messages for a given *bot_id*."""
+    client = load()
+    result = (
+        client.table("ChatHistory")
+        .select("content, snapshot")
+        .eq("bot_id", bot_id)
+        .order("created_at", desc=True)  # Assuming 'created_at' is the timestamp column
+        .limit(n)
+        .execute()
+    )
+
+    # The result.data will be a list of dictionaries like [{'content': '...', 'snapshot': '...'}]
+    return result.data if result.data else []
