@@ -29,13 +29,17 @@ class Config:
     openai_api_key: str = field(
         default_factory=lambda: os.getenv("OPENAI_API_KEY", "")
     )
-    # Embedding backend ('openai', 'sbert')
-    embedding_backend: str = field(
-        default_factory=lambda: os.getenv("EMBEDDING_BACKEND", "sbert")
+    spliting_model: str = field(
+        default_factory=lambda: os.getenv("SPLITING_MODEL", "sentence-transformers/all-mpnet-base-v2")
     )
-    # Local SentenceTransformer model name for embeddings (used when embedding_backend='sbert')
+    spliting_model_path: str = field(
+        default_factory=lambda: os.getenv("SPLITING_MODEL_PATH", "models/spliting_chunk_model")
+    )
     embedding_model: str = field(
         default_factory=lambda: os.getenv("EMBEDDING_MODEL", "sentence-transformers/paraphrase-multilingual-mpnet-base-v2")
+    )
+    embedding_model_path: str = field(
+        default_factory=lambda: os.getenv("EMBEDDING_MODEL_PATH", "models/embedding_model")
     )
     # Supabase settings
     Supabase_URL: str = field(

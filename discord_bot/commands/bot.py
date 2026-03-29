@@ -4,9 +4,15 @@ from __future__ import annotations
 import os
 import sys
 import uuid
+import asyncio
 
 import discord
 from discord import app_commands
+
+from agent.managers.rag_manager import index_backstory
+from agent.managers.traits_manager import update_bot_traits
+from agent.managers.emotion_condition_manager import create_emotion_conditions
+from agent.managers.worldview_manager import create_world_views_from_backstory
 
 _root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, _root)
@@ -79,20 +85,12 @@ class BotCreateModal(discord.ui.Modal, title="สร้าง Bot ของค�
             bot_id, discord_id, {"name": name, "backstory": backstory}
         )
 
-        # 3. Extract traits / emotion conditions / baseline emotions
-        from agent.managers.traits_manager import update_bot_traits
-        from agent.managers.emotion_condition_manager import create_emotion_conditions
-
         traits, conditions, emotions = update_bot_traits(bot_id, traits_text)
         create_emotion_conditions(bot_id, conditions)
 
         # 4. Extract world views from backstory
-        from agent.managers.worldview_manager import create_world_views_from_backstory
 
         world_views = create_world_views_from_backstory(bot_id, backstory)
-
-        # 5. Index backstory for RAG
-        from agent.managers.rag_manager import index_backstory
 
         index_backstory(bot_id, backstory)
 
@@ -145,8 +143,6 @@ bot_group = app_commands.Group(name="bot", description="จัดการ Bot �
 
 @bot_group.command(name="create", description="สร้างหรืออัปเดต Bot ของคุณ")
 async def bot_create(interaction: discord.Interaction) -> None:
-    import asyncio
-
     user_uuid = _discord_uuid(str(interaction.user.id))
     existing = await asyncio.to_thread(supa_db_manager.get_bot_profile_by_user, user_uuid)
     modal = BotCreateModal(existing)

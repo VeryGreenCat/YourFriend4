@@ -11,14 +11,11 @@ class GraphDatabase:
     def __init__(self, uri, user, password):
         self.driver = _Neo4jDriver.driver(uri, auth=(user, password))
         with self.driver.session() as session:
-            session.execute_write(self._run_setup)
+            session.execute_write(self._setup_trait)
+            session.execute_write(self._setup_vector_index)
 
     def close(self):
         self.driver.close()
-
-    def _run_setup(self, tx):
-        self._setup_trait(tx)
-        self._setup_vector_index(tx)
 
     def _setup_vector_index(self, tx):
         tx.run(

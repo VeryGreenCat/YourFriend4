@@ -7,7 +7,7 @@ from typing import Any
 
 from agent.utils.config import get_config
 from agent.utils.llm import chat_completion
-from agent.utils.constants import TRAIT_NODES, PRIMARY_EMOTIONS, SUB_EMOTIONS
+from agent.utils.constants import TRAIT_NODES, EMOTIONS
 
 
 def extract_traits_and_conditions(
@@ -26,7 +26,7 @@ def extract_traits_and_conditions(
     """
     cfg = get_config()
     trait_names = list(TRAIT_NODES.keys())
-    emotion_names = list(PRIMARY_EMOTIONS.keys()) + [e[0] for e in SUB_EMOTIONS]
+    emotion_names = [e[0] for e in EMOTIONS]
 
     system_prompt = (
         "You are a personality analyzer. Given a bot character's traits description, extract:\n"
@@ -104,7 +104,7 @@ def extract_traits_and_conditions(
             )
 
     # ── parse emotions ──
-    valid_emotions = set(list(PRIMARY_EMOTIONS.keys()) + [e[0] for e in SUB_EMOTIONS])
+    valid_emotions = set([e[0] for e in EMOTIONS])
     emotions: dict[str, float] = {}
     for k, v in data.get("emotions", {}).items():
         if k in valid_emotions:
