@@ -16,6 +16,7 @@ from .config import get_config
 
 def _call_ollama(ollama_url: str, model: str, messages: List[Dict[str, str]], temperature: float = 0.0, timeout: int = 30) -> str:
     url = ollama_url.rstrip("/") + "/api/chat"
+    print(f"Ollama url: {url}")
     payload = {"model": model, "messages": messages, "temperature": temperature}
     resp = requests.post(url, json=payload, timeout=timeout)
     # Ollama may return streaming or json — attempt to parse JSON first

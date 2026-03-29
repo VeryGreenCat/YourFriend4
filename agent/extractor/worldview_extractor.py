@@ -8,6 +8,7 @@ from typing import Any
 from agent.utils.config import get_config
 from agent.utils.llm import chat_completion
 from agent.utils.constants import TRAIT_NODES
+from agent.utils.logger import log_failure
 
 
 def extract_world_views(backstory: str) -> list[dict[str, Any]]:
@@ -52,22 +53,6 @@ def extract_world_views(backstory: str) -> list[dict[str, Any]]:
     ]
     content = chat_completion(cfg.traits_llm_model, messages, temperature=0)
 
-    # log failures when parsing the model output
-    def _log_failure(name: str, model: str, prompt_messages, output: str) -> None:
-        try:
-            import datetime, os
-            os.makedirs("logs", exist_ok=True)
-            path = os.path.join("logs", "extractor_failures.log")
-            with open(path, "a", encoding="utf-8") as fh:
-                fh.write(f"\n---\n{datetime.datetime.utcnow().isoformat()}Z | {name} | model={model}\n")
-                fh.write("MESSAGES:\n")
-                fh.write(str(prompt_messages))
-                fh.write("\nOUTPUT:\n")
-                fh.write(output)
-                fh.write("\n---\n")
-        except Exception:
-            pass
-
     data: list | None = None
     try:
         data = json.loads(content)
@@ -77,10 +62,10 @@ def extract_world_views(backstory: str) -> list[dict[str, Any]]:
             try:
                 data = json.loads(m.group(0))
             except Exception:
-                _log_failure("worldview_extractor", cfg.traits_llm_model, messages, content)
+                log_failure("worldview_extractor", cfg.traits_llm_model, messages, content)
                 pass
         else:
-            _log_failure("worldview_extractor", cfg.traits_llm_model, messages, content)
+            log_failure("worldview_extractor", cfg.traits_llm_model, messages, content)
     if not isinstance(data, list):
         return []
 

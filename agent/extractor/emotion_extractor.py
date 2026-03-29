@@ -3,6 +3,7 @@ from typing import Any, Dict, List
 
 from agent.utils.config import get_config
 from agent.utils.llm import chat_completion
+from agent.utils.logger import log_failure
 
 
 def predict_text_emotion(content: str) -> List[Dict[str, Any]]:
@@ -34,18 +35,7 @@ def predict_text_emotion(content: str) -> List[Dict[str, Any]]:
                         out.append({"label": item["label"], "score": float(item.get("score", 0))})
                 return out
         except Exception:
-            # log failure
-            try:
-                import datetime, os
-                os.makedirs("logs", exist_ok=True)
-                with open(os.path.join("logs", "extractor_failures.log"), "a", encoding="utf-8") as fh:
-                    fh.write(f"\n---\n{datetime.datetime.utcnow().isoformat()}Z | emotion_extractor | model={cfg.traits_llm_model}\nMESSAGES:\n")
-                    fh.write(str(messages))
-                    fh.write("\nOUTPUT:\n")
-                    fh.write(str(resp))
-                    fh.write("\n---\n")
-            except Exception:
-                pass
+            log_failure("emotion_extractor", cfg.traits_llm_model, messages, str(resp))
         # fallthrough to empty
         return []
 
