@@ -3,17 +3,17 @@ from __future__ import annotations
 import os
 import sys
 
-from dotenv import load_dotenv
 import discord
 from discord import app_commands
+from dotenv import load_dotenv
 
 _root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(_root, ".env"))
 sys.path.insert(0, _root)
 
 from agent.utils.config import get_config
-from discord_bot.commands import profile as profile_cmd
 from discord_bot.commands import bot as bot_cmd
+from discord_bot.commands import profile as profile_cmd
 
 
 class YourFriendBot(discord.Client):

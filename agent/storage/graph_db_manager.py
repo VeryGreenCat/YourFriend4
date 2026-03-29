@@ -1,10 +1,12 @@
 from datetime import datetime
 
-from agent.utils import PRIMARY_EMOTIONS, SUB_EMOTIONS, TRAIT_NODES
-from agent.utils import get_config
 from neo4j import GraphDatabase as _Neo4jDriver
 
+from agent.utils import EMOTIONS, TRAIT_NODES, get_config
+
 _graph_db = None
+
+
 class GraphDatabase:
     def __init__(self, uri, user, password):
         self.driver = _Neo4jDriver.driver(uri, auth=(user, password))
@@ -19,41 +21,35 @@ class GraphDatabase:
         self._setup_vector_index(tx)
 
     def _setup_vector_index(self, tx):
-        tx.run("""
+        tx.run(
+            """
             CREATE VECTOR INDEX backstory_vector_index IF NOT EXISTS
             FOR (n:BackstoryChunk) ON (n.embedding)
             OPTIONS { indexConfig: {
               `vector.dimensions`: 768,
               `vector.similarity_function`: 'cosine'
             }}
-        """)
+        """
+        )
 
     def _setup_trait(self, tx):
         for name, desc in TRAIT_NODES.items():
             tx.run(
                 "MERGE (t:Trait {name: $name}) SET t.description = $desc",
-                name=name, desc=desc,
+                name=name,
+                desc=desc,
             )
-        for name, desc in PRIMARY_EMOTIONS.items():
+        for name, desc in EMOTIONS:
             tx.run(
-                "MERGE (e:Emotion {name: $name}) SET e.category = 'primary', e.description = $desc",
-                name=name, desc=desc,
+                "MERGE (e:Emotion {name: $name}) SET e.description = $desc",
+                name=name,
+                desc=desc,
             )
-        for name, primary, desc in SUB_EMOTIONS:
-            tx.run(
-                "MERGE (e:Emotion {name: $name}) SET e.category = 'sub', e.description = $desc",
-                name=name, desc=desc,
-            )
-            tx.run("""
-                MATCH (sub:Emotion {name: $sub})
-                MATCH (pri:Emotion {name: $pri})
-                MERGE (sub)-[:BELONGS_TO]->(pri)
-            """, sub=name, pri=primary)
 
     def save_user(self, user_id, user_info):
-        name = user_info.get('name')
-        age = user_info.get('age')
-        gender = user_info.get('gender')
+        name = user_info.get("name")
+        age = user_info.get("age")
+        gender = user_info.get("gender")
         now = datetime.now().isoformat()
 
         query = """
@@ -71,24 +67,21 @@ class GraphDatabase:
             u.updatedAt = $now
         RETURN u
         """
-        
+
         with self.driver.session() as session:
             try:
-                result = session.run(query, 
-                                    user_id=user_id, 
-                                    name=name, 
-                                    age=age, 
-                                    gender=gender, 
-                                    now=now)
+                result = session.run(
+                    query, user_id=user_id, name=name, age=age, gender=gender, now=now
+                )
                 print(f"User {user_id} saved (created or updated) successfully.")
                 return result.single()
             except Exception as e:
                 print(f"Error saving user: {e}")
                 return None
-    
+
     def save_bot_profile(self, bot_id, user_id, bot_info):
-        name = bot_info.get('name')
-        backstory = bot_info.get('backstory')
+        name = bot_info.get("name")
+        backstory = bot_info.get("backstory")
         now = datetime.now().isoformat()
 
         query = """
@@ -107,21 +100,23 @@ class GraphDatabase:
         MERGE (u)-[:OWNS]->(b)
         RETURN b
         """
-        
+
         with self.driver.session() as session:
             try:
-                result = session.run(query, 
-                                    bot_id=bot_id, 
-                                    user_id=user_id,
-                                    name=name, 
-                                    backstory=backstory, 
-                                    now=now)
+                result = session.run(
+                    query,
+                    bot_id=bot_id,
+                    user_id=user_id,
+                    name=name,
+                    backstory=backstory,
+                    now=now,
+                )
                 print(f"Bot {bot_id} saved (created or updated) successfully.")
                 return result.single()
             except Exception as e:
                 print(f"Error saving bot profile: {e}")
                 return None
-            
+
     def get_user_summary(self, user_id):
         query = """
         MATCH (u:User {id: $user_id})-[:HAS_SUMMARY]->(s:UserSummary)
@@ -134,7 +129,7 @@ class GraphDatabase:
                 return record["summary"], record["embedding"]
             else:
                 return None, None
-            
+
     def update_user_summary(self, user_id, new_summary_text, vector_embedding):
         now = datetime.now().isoformat()
 
@@ -147,7 +142,13 @@ class GraphDatabase:
             s.updatedAt = $now
         """
         with self.driver.session() as session:
-            session.run(query, user_id=user_id, text=new_summary_text, vector=vector_embedding, now=now)
+            session.run(
+                query,
+                user_id=user_id,
+                text=new_summary_text,
+                vector=vector_embedding,
+                now=now,
+            )
 
     # ── Bot ↔ Trait ──────────────────────────────────────────
 
@@ -191,62 +192,95 @@ class GraphDatabase:
 
     # ── WorldView ────────────────────────────────────────────
 
-    def create_world_view(self, bot_id, wv_id, description, affected_traits, reason=None):
+    def create_world_view(
+        self, bot_id, wv_id, description, affected_traits, reason=None
+    ):
         with self.driver.session() as session:
-            session.run("""
+            session.run(
+                """
                 MATCH (b:Bot {id: $bot_id})
                 CREATE (wv:WorldView {id: $wv_id, description: $description})
                 CREATE (b)-[:HAS_WORLD_VIEW]->(wv)
-            """, bot_id=bot_id, wv_id=wv_id, description=description)
+            """,
+                bot_id=bot_id,
+                wv_id=wv_id,
+                description=description,
+            )
 
             for trait in affected_traits:
-                session.run("""
+                session.run(
+                    """
                     MATCH (wv:WorldView {id: $wv_id})
                     MATCH (t:Trait {name: $trait_name})
                     MERGE (wv)-[r:AFFECTS_TRAIT]->(t)
                     SET r.change_per_second = $rate
-                """, wv_id=wv_id, trait_name=trait["name"],
-                     rate=trait["change_per_second"])
+                """,
+                    wv_id=wv_id,
+                    trait_name=trait["name"],
+                    rate=trait["change_per_second"],
+                )
 
             if reason:
-                session.run("""
+                session.run(
+                    """
                     MATCH (wv:WorldView {id: $wv_id})
                     CREATE (r:Reason {text: $reason})
                     CREATE (wv)-[:HAS_REASON]->(r)
-                """, wv_id=wv_id, reason=reason)
+                """,
+                    wv_id=wv_id,
+                    reason=reason,
+                )
 
     def update_world_view(self, wv_id, description, affected_traits, reason=None):
         with self.driver.session() as session:
-            session.run("""
+            session.run(
+                """
                 MATCH (wv:WorldView {id: $wv_id})
                 SET wv.description = $description
-            """, wv_id=wv_id, description=description)
+            """,
+                wv_id=wv_id,
+                description=description,
+            )
 
-            session.run("""
+            session.run(
+                """
                 MATCH (wv:WorldView {id: $wv_id})-[r:AFFECTS_TRAIT]->()
                 DELETE r
-            """, wv_id=wv_id)
+            """,
+                wv_id=wv_id,
+            )
 
             for trait in affected_traits:
-                session.run("""
+                session.run(
+                    """
                     MATCH (wv:WorldView {id: $wv_id})
                     MATCH (t:Trait {name: $trait_name})
                     MERGE (wv)-[r:AFFECTS_TRAIT]->(t)
                     SET r.change_per_second = $rate
-                """, wv_id=wv_id, trait_name=trait["name"],
-                     rate=trait["change_per_second"])
+                """,
+                    wv_id=wv_id,
+                    trait_name=trait["name"],
+                    rate=trait["change_per_second"],
+                )
 
-            session.run("""
+            session.run(
+                """
                 MATCH (wv:WorldView {id: $wv_id})-[:HAS_REASON]->(r:Reason)
                 DETACH DELETE r
-            """, wv_id=wv_id)
+            """,
+                wv_id=wv_id,
+            )
 
             if reason:
-                session.run("""
+                session.run(
+                    """
                     MATCH (wv:WorldView {id: $wv_id})
                     CREATE (r:Reason {text: $reason})
                     CREATE (wv)-[:HAS_REASON]->(r)
-                """, wv_id=wv_id, reason=reason)
+                """,
+                    wv_id=wv_id,
+                    reason=reason,
+                )
 
     def remove_world_view(self, wv_id):
         query = """
@@ -283,37 +317,57 @@ class GraphDatabase:
 
     def create_emotion_condition(self, bot_id, ec_id, description, reason=None):
         with self.driver.session() as session:
-            session.run("""
+            session.run(
+                """
                 MATCH (b:Bot {id: $bot_id})
                 CREATE (ec:EmotionCondition {id: $ec_id, description: $description})
                 CREATE (b)-[:HAS_EMOTION_CONDITION]->(ec)
-            """, bot_id=bot_id, ec_id=ec_id, description=description)
+            """,
+                bot_id=bot_id,
+                ec_id=ec_id,
+                description=description,
+            )
 
             if reason:
-                session.run("""
+                session.run(
+                    """
                     MATCH (ec:EmotionCondition {id: $ec_id})
                     CREATE (r:Reason {text: $reason})
                     CREATE (ec)-[:HAS_REASON]->(r)
-                """, ec_id=ec_id, reason=reason)
+                """,
+                    ec_id=ec_id,
+                    reason=reason,
+                )
 
     def update_emotion_condition(self, ec_id, description, reason=None):
         with self.driver.session() as session:
-            session.run("""
+            session.run(
+                """
                 MATCH (ec:EmotionCondition {id: $ec_id})
                 SET ec.description = $description
-            """, ec_id=ec_id, description=description)
+            """,
+                ec_id=ec_id,
+                description=description,
+            )
 
-            session.run("""
+            session.run(
+                """
                 MATCH (ec:EmotionCondition {id: $ec_id})-[:HAS_REASON]->(r:Reason)
                 DETACH DELETE r
-            """, ec_id=ec_id)
+            """,
+                ec_id=ec_id,
+            )
 
             if reason:
-                session.run("""
+                session.run(
+                    """
                     MATCH (ec:EmotionCondition {id: $ec_id})
                     CREATE (r:Reason {text: $reason})
                     CREATE (ec)-[:HAS_REASON]->(r)
-                """, ec_id=ec_id, reason=reason)
+                """,
+                    ec_id=ec_id,
+                    reason=reason,
+                )
 
     def remove_emotion_condition(self, ec_id):
         query = """
@@ -349,7 +403,8 @@ class GraphDatabase:
         """chunks: list[str], embeddings: list[list[float]]"""
         with self.driver.session() as session:
             for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
-                session.run("""
+                session.run(
+                    """
                     CREATE (:BackstoryChunk {
                         id: $id,
                         bot_id: $bot_id,
@@ -357,8 +412,13 @@ class GraphDatabase:
                         embedding: $emb,
                         chunk_index: $idx
                     })
-                """, id=f"{bot_id}_{i}", bot_id=bot_id,
-                     text=chunk, emb=emb, idx=i)
+                """,
+                    id=f"{bot_id}_{i}",
+                    bot_id=bot_id,
+                    text=chunk,
+                    emb=emb,
+                    idx=i,
+                )
 
     def clear_backstory_chunks(self, bot_id):
         query = """
@@ -377,11 +437,10 @@ class GraphDatabase:
         ORDER BY score DESC
         """
         with self.driver.session() as session:
-            result = session.run(query, k=top_k, emb=query_embedding,
-                                bot_id=bot_id)
+            result = session.run(query, k=top_k, emb=query_embedding, bot_id=bot_id)
             return [r["text"] for r in result]
 
-    
+
 def load():
     global _graph_db
     if _graph_db is None:
@@ -393,6 +452,7 @@ def load():
         )
     return _graph_db
 
+
 def close():
     global _graph_db
     if _graph_db is not None:
@@ -401,7 +461,7 @@ def close():
 
 
 # emotions: main->happiness, sadness, fear, disgust, anger, and surprise
-# sub_emotions: 
+# sub_emotions:
 # Admiration: Respect for someone.
 # Adoration: Deep love and admiration.
 # Aesthetic appreciation: Appreciation of beauty.
@@ -428,4 +488,4 @@ def close():
 # Sadness: Unhappiness.
 # Satisfaction: Fulfillment.
 # Sexual desire: Physical longing.
-# Surprise: Astonishment. 
+# Surprise: Astonishment.
