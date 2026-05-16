@@ -34,6 +34,7 @@ def analyze_message(bot_id: str, user_id: str, user_input: str) -> str:
     # ── Phase 2: Think ───────────────────────────────────────
     thinking_result = think(
         user_input=user_input,
+        user_id=user_id,
         bot_id=bot_id,
         bot_name=bot_name,
         traits=traits,

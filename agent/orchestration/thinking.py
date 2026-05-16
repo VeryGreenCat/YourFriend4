@@ -6,7 +6,7 @@ from langgraph.graph import END, StateGraph
 
 from agent.managers import rag_manager
 from agent.memory import memory_manager
-from agent.storage import graph_db_manager
+from agent.storage import graph_db_manager, supa_db_manager
 from agent.utils import llm
 from agent.utils.config import get_config
 
@@ -18,6 +18,7 @@ class ThinkingResult(TypedDict):
 
 class ThinkingState(TypedDict):
     user_input: str
+    user_id: str
     bot_id: str
     bot_name: str
     traits: Dict[str, float]
@@ -51,6 +52,9 @@ def generate_response(state: ThinkingState) -> ThinkingState:
     import time as _time
 
     cfg = get_config()
+    profile = supa_db_manager.get_profile(state["user_id"])
+    display_name = profile.get("display_name", "Unknown") if profile else "Unknown"
+    gender = profile.get("gender", "Unknown") if profile else "Unknown"
     bot_name = state["bot_name"]
     unix_time = int(_time.time())
 
@@ -108,6 +112,8 @@ def generate_response(state: ThinkingState) -> ThinkingState:
 Current Unix Time: {unix_time}
 
 User's message: {state["user_input"]}
+User Display Name: {display_name}
+User Gender: {gender}
 
 === Bot Context ===
 
@@ -157,6 +163,7 @@ Relevant Backstory Chunks:
 
 def think(
     user_input: str,
+    user_id: str,
     bot_id: str,
     bot_name: str,
     traits: Dict[str, float],
@@ -167,6 +174,7 @@ def think(
 
     Args:
         user_input:       The user's latest message.
+        user_id:          The user's unique identifier.
         bot_id:           The bot's unique identifier.
         traits:           Bot personality traits {name: weight}.
         current_emotions: Bot's current emotional state
@@ -191,6 +199,7 @@ def think(
 
     initial_state: ThinkingState = {
         "user_input": user_input,
+        "user_id": user_id,
         "bot_id": bot_id,
         "bot_name": bot_name,
         "traits": traits,

@@ -192,6 +192,7 @@ class GraphDatabase:
         """
         with self.driver.session() as session:
             session.run(query, bot_id=bot_id, trait_name=trait_name, weight=weight)
+            print(f"Linked bot {bot_id} with trait {trait_name}, weight: {weight}")
 
     def clear_bot_traits(self, bot_id):
         query = """
